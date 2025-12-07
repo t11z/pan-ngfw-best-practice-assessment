@@ -30,6 +30,9 @@
 
     <div id="reportSection" class="hidden mt-6">
       <h2 class="text-2xl font-bold mb-4 text-pink-400">Report JSON</h2>
+      <div id="reportLinks" class="hidden mb-4">
+        <a id="downloadLink" class="text-pink-300 underline break-all" target="_blank" rel="noopener noreferrer">Download BPA report</a>
+      </div>
       <pre id="jsonOutput" class="bg-gray-800 p-4 rounded overflow-auto text-sm whitespace-pre-wrap"></pre>
     </div>
   </div>
@@ -39,6 +42,8 @@
     const activity = document.getElementById('activity');
     const reportSection = document.getElementById('reportSection');
     const jsonOutput = document.getElementById('jsonOutput');
+    const downloadLink = document.getElementById('downloadLink');
+    const reportLinks = document.getElementById('reportLinks');
 
     function getBasePath() {
       const parts = window.location.pathname.split('/');
@@ -62,6 +67,8 @@
       activity.classList.remove('hidden');
       reportSection.classList.add('hidden');
       jsonOutput.textContent = '';
+      reportLinks.classList.add('hidden');
+      downloadLink.removeAttribute('href');
 
       try {
         const basePath = getBasePath();
@@ -82,9 +89,13 @@
           throw new Error(result.error || 'Unknown error');
         }
 
-        activity.textContent = '📥 BPA report received.';
-        status.textContent = '✅ Report ready!';
+        activity.textContent = '📥 BPA report ready for download.';
+        status.textContent = '✅ Report ready! Use the signed URL before it expires.';
         jsonOutput.textContent = JSON.stringify(result, null, 2);
+        if (result['download-url']) {
+          downloadLink.href = result['download-url'];
+          reportLinks.classList.remove('hidden');
+        }
         reportSection.classList.remove('hidden');
       } catch (err) {
         activity.textContent = '';
