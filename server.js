@@ -14,24 +14,25 @@ const basePath = process.env.BASE_PATH || '/';
 app.use(basePath, express.static('public'));
 
 function extractSystemInfo(fileContent) {
-  const getField = (label) => {
-    const regex = new RegExp(`${label}\\s*[:=]?\\s*(.+)`, 'i');
-    const match = fileContent.match(regex);
+  const systemInfoSectionMatch = fileContent.match(/> show system info\s*([\s\S]*?)(\n> |\n?$)/);
+  if (!systemInfoSectionMatch) return {};
+
+  const section = systemInfoSectionMatch[1];
+
+  const extractLineValue = (label) => {
+    const match = section.match(new RegExp(`^\\s*${label}\\s*:\\s*(.+)$`, 'm'));
     return match ? match[1].trim() : null;
   };
 
-  const serial = getField('Serial number');
-  const model = getField('Model');
-  const version = getField('SW version');
-  const hostname = getField('Hostname');
-
-  let family = 'Unknown';
-  if (model?.startsWith('PA-')) family = 'PA-Series';
-  else if (model?.startsWith('VM-')) family = 'VM-Series';
-  else if (model?.startsWith('CN-')) family = 'CN-Series';
-
-  return { serial, model, version, family, requesterName: hostname };
+  return {
+    serial: extractLineValue('serial'),
+    model: extractLineValue('model'),
+    version: extractLineValue('sw-version'),
+    family: extractLineValue('family'),
+    requesterName: extractLineValue('hostname'),
+  };
 }
+
 
 
 app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
