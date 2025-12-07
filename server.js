@@ -15,7 +15,8 @@ app.use(basePath, express.static('public'));
 
 function extractSystemInfo(fileContent) {
   const getField = (label) => {
-    const match = fileContent.match(new RegExp(`${label}:\s*(.+)`));
+    const regex = new RegExp(`${label}\\s*[:=]?\\s*(.+)`, 'i');
+    const match = fileContent.match(regex);
     return match ? match[1].trim() : null;
   };
 
@@ -31,6 +32,7 @@ function extractSystemInfo(fileContent) {
 
   return { serial, model, version, family, requesterName: hostname };
 }
+
 
 app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
   const { clientId, clientSecret, tsgId, email } = req.body;
