@@ -45,6 +45,13 @@
   <script>
     const status = document.getElementById('status');
     const activity = document.getElementById('activity');
+    const reportSection = document.getElementById('reportSection');
+    const jsonOutput = document.getElementById('jsonOutput');
+
+    function getBasePath() {
+      const parts = window.location.pathname.split('/');
+      return parts.slice(0, parts.length - 1).join('/') || '';
+    }
 
     document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -63,25 +70,37 @@
       formData.append('email', email);
 
       status.textContent = '';
-      activity.textContent = 'Uploading and analyzing the tech support file...';
+      activity.textContent = '📤 Uploading and analyzing the tech support file...';
       activity.classList.remove('hidden');
+      reportSection.classList.add('hidden');
+      jsonOutput.textContent = '';
 
       try {
-        const response = await fetch('/api/upload', {
+        const basePath = getBasePath();
+        const response = await fetch(`${basePath}/api/upload`, {
           method: 'POST',
           body: formData
         });
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Unknown error');
+        const text = await response.text();
+        let result;
+        try {
+          result = JSON.parse(text);
+        } catch {
+          throw new Error('Server returned invalid JSON');
+        }
 
-        activity.textContent = 'Report successfully retrieved.';
-        status.textContent = 'Report ready!';
-        document.getElementById('jsonOutput').textContent = JSON.stringify(result, null, 2);
-        document.getElementById('reportSection').classList.remove('hidden');
+        if (!response.ok) {
+          throw new Error(result.error || 'Unknown error');
+        }
+
+        activity.textContent = '📥 BPA report received.';
+        status.textContent = '✅ Report ready!';
+        jsonOutput.textContent = JSON.stringify(result, null, 2);
+        reportSection.classList.remove('hidden');
       } catch (err) {
         activity.textContent = '';
-        status.textContent = `Error: ${err.message}`;
+        status.textContent = `❌ Error: ${err.message}`;
       }
     });
   </script>
