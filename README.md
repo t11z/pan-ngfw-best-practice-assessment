@@ -1,3 +1,4 @@
+[![Build and Publish Docker Image](https://github.com/t11z/pan-ngfw-best-practice-assessment/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/t11z/pan-ngfw-best-practice-assessment/actions/workflows/docker-publish.yml)
 # AIOps BPA Report Viewer (Dockerized)
 
 This web application allows you to upload a PAN-OS tech support or config file, authenticate using a Service Account, and retrieve a Best Practice Assessment (BPA) report via the Palo Alto Networks AIOps API.
