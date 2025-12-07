@@ -76,6 +76,8 @@ app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
     }
 
     // Step 3: Request BPA job
+    const normalizedRequesterName = (requesterName || email || '').trim();
+
     const bpaRes = await fetch('https://api.stratacloud.paloaltonetworks.com/aiops/bpa/v1/requests', {
       method: 'POST',
       headers: {
@@ -84,11 +86,11 @@ app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
       },
       body: JSON.stringify({
         'requester-email': email,
+        'requester-name': normalizedRequesterName,
         serial: info.serial,
         model: info.model,
         version: info.version,
-        family: info.family,
-        requesterName: requesterName || email
+        family: info.family
       })
     });
 
