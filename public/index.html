@@ -42,42 +42,44 @@
     </div>
   </div>
 
-  <script>
-    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
+<script>
+  const basePath = window.location.pathname.replace(/\/(index\.html)?$/, '');
 
-      const status = document.getElementById('status');
-      const file = document.getElementById('fileInput').files[0];
-      const clientId = document.getElementById('clientId').value;
-      const clientSecret = document.getElementById('clientSecret').value;
-      const tsgId = document.getElementById('tsgId').value;
-      const email = document.getElementById('email').value;
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('clientId', clientId);
-      formData.append('clientSecret', clientSecret);
-      formData.append('tsgId', tsgId);
-      formData.append('email', email);
+    const status = document.getElementById('status');
+    const file = document.getElementById('fileInput').files[0];
+    const clientId = document.getElementById('clientId').value;
+    const clientSecret = document.getElementById('clientSecret').value;
+    const tsgId = document.getElementById('tsgId').value;
+    const email = document.getElementById('email').value;
 
-      status.textContent = 'Submitting...';
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('clientId', clientId);
+    formData.append('clientSecret', clientSecret);
+    formData.append('tsgId', tsgId);
+    formData.append('email', email);
 
-      try {
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData
-        });
+    status.textContent = 'Submitting...';
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Unknown error');
+    try {
+      const response = await fetch(`${basePath}/api/upload`, {
+        method: 'POST',
+        body: formData
+      });
 
-        status.textContent = 'Report ready!';
-        document.getElementById('jsonOutput').textContent = JSON.stringify(result, null, 2);
-        document.getElementById('reportSection').classList.remove('hidden');
-      } catch (err) {
-        status.textContent = `Error: ${err.message}`;
-      }
-    });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Unknown error');
+
+      status.textContent = 'Report ready!';
+      document.getElementById('jsonOutput').textContent = JSON.stringify(result, null, 2);
+      document.getElementById('reportSection').classList.remove('hidden');
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+    }
+  });
   </script>
 </body>
 </html>
