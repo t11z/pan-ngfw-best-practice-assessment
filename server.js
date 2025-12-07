@@ -2,7 +2,6 @@ const express = require('express');
 const multer = require('multer');
 const fetch = require('node-fetch');
 const fs = require('fs');
-const FormData = require('form-data');
 const tar = require('tar');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
@@ -32,6 +31,13 @@ function extractSystemInfo(fileContent) {
   };
 }
 
+function assertRequiredFields(info) {
+  const missingFields = ['serial', 'model', 'version', 'family'].filter((field) => !info[field]);
+  if (missingFields.length > 0) {
+    throw new Error(`Missing required system info fields: ${missingFields.join(', ')}`);
+  }
+}
+
 
 
 app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
@@ -41,6 +47,10 @@ app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
   const clientId = process.env.CLIENT_ID;
   const clientSecret = process.env.CLIENT_SECRET;
   const tsgId = process.env.TSG_ID;
+
+  if (!email || !requesterName) {
+    return res.status(400).json({ error: 'Requester email and name are required.' });
+  }
 
   if (!clientId || !clientSecret || !tsgId) {
     return res.status(500).json({ error: 'Client credentials or TSG ID are not configured on the server.' });
@@ -70,13 +80,13 @@ app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
     if (cliFiles.length === 0) throw new Error('No CLI info file found in Tech Support');
     const cliContent = fs.readFileSync(path.join(cliDir, cliFiles[0]), 'utf8');
     const info = extractSystemInfo(cliContent);
-
-    if (!info.serial || !info.model || !info.version) {
-      throw new Error('Missing required system info fields');
-    }
+    assertRequiredFields(info);
 
     // Step 3: Request BPA job
     const normalizedRequesterName = (requesterName || email || '').trim();
+    if (!normalizedRequesterName) {
+      throw new Error('Requester name could not be determined.');
+    }
 
     const bpaRes = await fetch('https://api.stratacloud.paloaltonetworks.com/aiops/bpa/v1/requests', {
       method: 'POST',
@@ -121,10 +131,16 @@ app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
       const statusRes = await fetch(`https://api.stratacloud.paloaltonetworks.com/aiops/bpa/v1/jobs/${jobId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (!statusRes.ok) {
+        const statusText = await statusRes.text();
+        throw new Error(`Failed to fetch BPA job status: ${statusRes.status} ${statusText}`);
+      }
+
       const status = await statusRes.json();
-      if (status.status?.includes('COMPLETED')) reportReady = true;
-      else if (status.status?.includes('FAILED')) {
-        throw new Error('BPA job failed');
+      if (status.status === 'COMPLETED_WITH_SUCCESS') {
+        reportReady = true;
+      } else if (status.status === 'COMPLETED_WITH_ERROR') {
+        throw new Error('BPA job completed with an error');
       }
       attempts++;
     }
@@ -134,11 +150,20 @@ app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
     const reportRes = await fetch(`https://api.stratacloud.paloaltonetworks.com/aiops/bpa/v1/reports/${jobId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    const reportMeta = await reportRes.json();
-    const downloadRes = await fetch(reportMeta['download-url']);
-    const reportData = await downloadRes.json();
+    if (!reportRes.ok) {
+      const reportText = await reportRes.text();
+      throw new Error(`Failed to fetch BPA report metadata: ${reportRes.status} ${reportText}`);
+    }
 
-    res.json(reportData);
+    const reportMeta = await reportRes.json();
+    const downloadUrl = reportMeta['download-url'];
+
+    if (!downloadUrl) throw new Error('BPA report download URL missing from response');
+
+    res.json({
+      id: jobId,
+      'download-url': downloadUrl
+    });
   } catch (err) {
     console.error('🔥 Error:', err);
     res.status(500).json({ error: err.message || 'Unexpected error' });
