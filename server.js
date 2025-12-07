@@ -35,9 +35,16 @@ function extractSystemInfo(fileContent) {
 
 
 app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
-  const { clientId, clientSecret, tsgId, email, requesterName } = req.body;
+  const { email, requesterName } = req.body;
   const filePath = req.file.path;
   const extractDir = `extracted_${uuidv4()}`;
+  const clientId = process.env.CLIENT_ID;
+  const clientSecret = process.env.CLIENT_SECRET;
+  const tsgId = process.env.TSG_ID;
+
+  if (!clientId || !clientSecret || !tsgId) {
+    return res.status(500).json({ error: 'Client credentials or TSG ID are not configured on the server.' });
+  }
 
   try {
     // Step 1: Get OAuth token
