@@ -3,14 +3,38 @@ const multer = require('multer');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const FormData = require('form-data');
+const tar = require('tar');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
 app.use(express.static('public'));
 
+function extractSystemInfo(fileContent) {
+  const getField = (label) => {
+    const match = fileContent.match(new RegExp(`${label}:\s*(.+)`));
+    return match ? match[1].trim() : null;
+  };
+
+  const serial = getField('Serial number');
+  const model = getField('Model');
+  const version = getField('SW version');
+  const hostname = getField('Hostname');
+
+  let family = 'Unknown';
+  if (model?.startsWith('PA-')) family = 'PA-Series';
+  else if (model?.startsWith('VM-')) family = 'VM-Series';
+  else if (model?.startsWith('CN-')) family = 'CN-Series';
+
+  return { serial, model, version, family, requesterName: hostname };
+}
+
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   const { clientId, clientSecret, tsgId, email } = req.body;
   const filePath = req.file.path;
+  const extractDir = `extracted_${uuidv4()}`;
 
   try {
     // Step 1: Get OAuth token
@@ -23,29 +47,38 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       body: `grant_type=client_credentials&scope=tsg_id:${tsgId}`
     });
 
-    const authText = await auth.text();
-    let authData;
+    const authData = await auth.json();
+    const token = authData.access_token;
+    if (!token) throw new Error('OAuth token missing');
+    console.log('✅ OAuth token fetched:', token);
 
-    try {
-      authData = JSON.parse(authText);
-    } catch (e) {
-      console.error('❌ Failed to parse auth response:', authText);
-      return res.status(500).json({ error: 'OAuth response was not valid JSON' });
+    // Step 2: Extract .tgz
+    await tar.x({ file: filePath, cwd: extractDir });
+    const cliDir = path.join(extractDir, 'tmp', 'cli');
+    const cliFiles = fs.readdirSync(cliDir).filter(f => f.endsWith('.txt'));
+    if (cliFiles.length === 0) throw new Error('No CLI info file found in Tech Support');
+    const cliContent = fs.readFileSync(path.join(cliDir, cliFiles[0]), 'utf8');
+    const info = extractSystemInfo(cliContent);
+
+    if (!info.serial || !info.model || !info.version) {
+      throw new Error('Missing required system info fields');
     }
 
-    console.log('✅ OAuth token fetched:', authData.access_token);
-    const token = authData.access_token;
-    if (!token) return res.status(500).json({ error: 'No token received from OAuth server' });
-
-    // Step 2: Request BPA job
-    console.log('➡️ Sending BPA job request...');
+    // Step 3: Request BPA job
     const bpaRes = await fetch('https://api.stratacloud.paloaltonetworks.com/aiops/bpa/v1/requests', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ 'requester-email': email })
+      body: JSON.stringify({
+        'requester-email': email,
+        serial: info.serial,
+        model: info.model,
+        version: info.version,
+        family: info.family,
+        requesterName: info.requesterName || 'Unknown'
+      })
     });
 
     const bpaText = await bpaRes.text();
@@ -53,14 +86,14 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     console.log('📥 BPA response body:', bpaText);
 
     if (!bpaRes.ok) {
-      return res.status(500).json({ error: 'Failed to start BPA job', details: bpaText });
+      throw new Error(`Failed to start BPA job: ${bpaText}`);
     }
 
     const bpa = JSON.parse(bpaText);
     const jobId = bpa.id;
     const uploadUrl = bpa['upload-url'];
 
-    // Step 3: Upload file
+    // Step 4: Upload original file to AIOps
     const uploadFile = fs.readFileSync(filePath);
     await fetch(uploadUrl, {
       method: 'PUT',
@@ -68,7 +101,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       headers: { 'Content-Type': 'application/octet-stream' }
     });
 
-    // Step 4: Poll until report is ready
+    // Step 5: Poll for report readiness
     let reportReady = false, attempts = 0;
     while (!reportReady && attempts < 20) {
       await new Promise(r => setTimeout(r, 3000));
@@ -76,17 +109,15 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         headers: { Authorization: `Bearer ${token}` }
       });
       const status = await statusRes.json();
-      if (status.status && status.status.includes('COMPLETED')) {
-        reportReady = true;
-      } else if (status.status && status.status.includes('FAILED')) {
-        return res.status(500).json({ error: 'BPA job failed.' });
+      if (status.status?.includes('COMPLETED')) reportReady = true;
+      else if (status.status?.includes('FAILED')) {
+        throw new Error('BPA job failed');
       }
       attempts++;
     }
 
-    if (!reportReady) return res.status(500).json({ error: 'Timeout waiting for BPA job.' });
+    if (!reportReady) throw new Error('Timeout waiting for BPA job.');
 
-    // Step 5: Download report
     const reportRes = await fetch(`https://api.stratacloud.paloaltonetworks.com/aiops/bpa/v1/reports/${jobId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -94,12 +125,14 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     const downloadRes = await fetch(reportMeta['download-url']);
     const reportData = await downloadRes.json();
 
-    fs.unlinkSync(filePath);
     res.json(reportData);
   } catch (err) {
-    console.error('🔥 Unexpected error:', err);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    console.error('🔥 Error:', err);
     res.status(500).json({ error: err.message || 'Unexpected error' });
+  } finally {
+    // Clean up files and dirs
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    if (fs.existsSync(extractDir)) fs.rmSync(extractDir, { recursive: true, force: true });
   }
 });
 
