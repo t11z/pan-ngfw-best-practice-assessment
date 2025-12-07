@@ -7,6 +7,7 @@ const app = express();
 const upload = multer({ dest: 'uploads/' });
 
 app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
 
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   const { clientId, clientSecret, tsgId, email } = req.body;
