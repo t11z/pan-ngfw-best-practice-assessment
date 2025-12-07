@@ -54,6 +54,7 @@ app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
     console.log('✅ OAuth token fetched:', token);
 
     // Step 2: Extract .tgz
+    fs.mkdirSync(extractDir, { recursive: true });
     await tar.x({ file: filePath, cwd: extractDir });
     const cliDir = path.join(extractDir, 'tmp', 'cli');
     const cliFiles = fs.readdirSync(cliDir).filter(f => f.endsWith('.txt'));
