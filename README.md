@@ -6,10 +6,8 @@ This web application allows you to upload a PAN-OS tech support or config file, 
 ## 🔧 Features
 
 - Upload `.tgz` or `.xml` PAN-OS configuration files
-- Enter Client ID, Client Secret, TSG ID, and email
 - Generates BPA report through official AIOps for NGFW BPA API
 - Displays JSON report in a clean, readable format
-- Tailwind CSS design with a dark theme (inspired by Palo Alto's Gravatar styling)
 - Packaged as a fully self-contained Docker container
 
 ---
@@ -25,7 +23,11 @@ docker build -t bpa-report-app .
 ### 2. Run the container
 
 ```bash
-docker run -p 3000:3000 bpa-report-app
+docker run -p 3000:3000 \
+  -e CLIENT_ID="your-client-id" \
+  -e CLIENT_SECRET="your-client-secret" \
+  -e TSG_ID="your-tsg-id" \
+  bpa-report-app
 ```
 
 ### 3. Open in your browser
@@ -51,10 +53,9 @@ bpa-report-app/
 
 You need a valid Service Account for AIOps API access. The following fields are required:
 
-- `Client ID`
-- `Client Secret`
-- `TSG ID` (Tenant Service Group ID)
-- `Requester Email`
+- `Client ID` (provided via `CLIENT_ID` environment variable)
+- `Client Secret` (provided via `CLIENT_SECRET` environment variable)
+- `TSG ID` (Tenant Service Group ID, provided via `TSG_ID` environment variable)
 
 OAuth tokens are retrieved and used for all subsequent API requests.
 
