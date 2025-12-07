@@ -65,6 +65,7 @@
       const clientSecret = document.getElementById('clientSecret').value;
       const tsgId = document.getElementById('tsgId').value;
       const email = document.getElementById('email').value;
+      const requesterName = document.getElementById('requesterName').value;
 
       const formData = new FormData();
       formData.append('file', file);
@@ -72,6 +73,7 @@
       formData.append('clientSecret', clientSecret);
       formData.append('tsgId', tsgId);
       formData.append('email', email);
+      formData.append('requesterName', requesterName);
 
       status.textContent = '';
       activity.textContent = '📤 Uploading and analyzing the tech support file...';
