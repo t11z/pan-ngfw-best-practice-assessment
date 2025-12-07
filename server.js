@@ -10,7 +10,8 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-app.use(express.static('public'));
+const basePath = process.env.BASE_PATH || '/';
+app.use(basePath, express.static('public'));
 
 function extractSystemInfo(fileContent) {
   const getField = (label) => {
@@ -31,7 +32,7 @@ function extractSystemInfo(fileContent) {
   return { serial, model, version, family, requesterName: hostname };
 }
 
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
   const { clientId, clientSecret, tsgId, email } = req.body;
   const filePath = req.file.path;
   const extractDir = `extracted_${uuidv4()}`;
