@@ -95,8 +95,8 @@ app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        'requester-email': email,
-        'requester-name': normalizedRequesterName,
+        requesterEmail: email,
+        requesterName: normalizedRequesterName,
         serial: info.serial,
         model: info.model,
         version: info.version,
