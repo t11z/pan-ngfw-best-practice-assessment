@@ -36,7 +36,7 @@ function extractSystemInfo(fileContent) {
 
 
 app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
-  const { clientId, clientSecret, tsgId, email } = req.body;
+  const { clientId, clientSecret, tsgId, email, requesterName } = req.body;
   const filePath = req.file.path;
   const extractDir = `extracted_${uuidv4()}`;
 
@@ -82,7 +82,7 @@ app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
         model: info.model,
         version: info.version,
         family: info.family,
-        requesterName: info.requesterName || 'Unknown'
+        requesterName: requesterName || info.requesterName || email
       })
     });
 
