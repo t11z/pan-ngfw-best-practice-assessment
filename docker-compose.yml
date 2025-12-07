@@ -1,0 +1,8 @@
+services:
+  bpa-report-app:
+    image: t11z/bpa-report-app:latest
+    container_name: bpa-report-app
+    build: .
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
