@@ -28,8 +28,7 @@ function extractSystemInfo(fileContent) {
     serial: extractLineValue('serial'),
     model: extractLineValue('model'),
     version: extractLineValue('sw-version'),
-    family: extractLineValue('family'),
-    requesterName: extractLineValue('hostname'),
+    family: extractLineValue('family')
   };
 }
 
@@ -82,7 +81,7 @@ app.post(`${basePath}api/upload`, upload.single('file'), async (req, res) => {
         model: info.model,
         version: info.version,
         family: info.family,
-        requesterName: requesterName || info.requesterName || email
+        requesterName: requesterName || email
       })
     });
 
